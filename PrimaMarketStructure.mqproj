@@ -1,0 +1,88 @@
+﻿{
+  "platform"    :"mt5",
+  "program_type":"indicator",
+  "copyright"   :"Copyright 2026, Primadi Setiawan",
+  "link"        :"https:\/\/www.mql5.com",
+  "version"     :"1.00",
+  "cpu_architecture" :"0",
+  "optimize"    :"1",
+  "fpzerocheck" :"1",
+  "tester_no_cache":"0",
+  "tester_everytick_calculate":"0",
+  "unicode_character_set":"0",
+  "static_libraries":"0",
+
+  "indicator":
+  {
+    "window":"0"
+  },
+
+  "files":
+  [
+    {
+      "path":"PrimaMarketStructure.mq5",
+      "compile":true,
+      "relative_to_project":true
+    },
+    {
+      "path":"PrimaMarketStructure.mqh",
+      "compile":false,
+      "relative_to_project":true
+    },
+    {
+      "path":"DrawUtils.mqh",
+      "compile":false,
+      "relative_to_project":true
+    },
+    {
+      "path":"utils.mqh",
+      "compile":false,
+      "relative_to_project":true
+    },
+    {
+      "path":"MQL5\\Include\\Controls\\Button.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\Controls\\WndObj.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\Controls\\Wnd.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\Controls\\Rect.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\Controls\\Defines.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\Object.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\StdLibErr.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\ChartObjects\\ChartObjectsTxtControls.mqh",
+      "compile":false,
+      "relative_to_project":false
+    },
+    {
+      "path":"MQL5\\Include\\ChartObjects\\ChartObject.mqh",
+      "compile":false,
+      "relative_to_project":false
+    }
+  ]
+}
