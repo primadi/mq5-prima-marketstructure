@@ -83,6 +83,11 @@
       "path":"MQL5\\Include\\ChartObjects\\ChartObject.mqh",
       "compile":false,
       "relative_to_project":false
+    },
+    {
+      "path":"temp.mqh",
+      "compile":false,
+      "relative_to_project":true
     }
   ]
 }

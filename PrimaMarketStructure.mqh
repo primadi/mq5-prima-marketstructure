@@ -22,8 +22,8 @@ class MarketStructure {
       PIVOT calcTempPivot(const PIVOT &pivots[], const MqlRates &rates[], const string symbol, const ENUM_TIMEFRAMES tf);
    public:
       void DrawPivots(PIVOT &pivots[], const MqlRates &rates[]);
-      void UpdateExtPivots(PIVOT &extPivots[], PIVOT &pivots[], MqlRates &rates[]);
-      void DrawExtPivots(PIVOT &extPivots[], MqlRates &rates[]);      
+      void UpdateExtPivots(PIVOT &extPivots[], PIVOT &pivots[]);
+      void DrawExtPivots(PIVOT &extPivots[]);      
       
       void UpdateAllPivots(PIVOT &pivots[], const int numPivot, const int numRightBar,
          const MqlRates &rates[], const string symbol, const ENUM_TIMEFRAMES tf) {
@@ -153,17 +153,14 @@ PIVOT MarketStructure::calcTempPivot(const PIVOT &pivots[], const MqlRates &rate
    return pv;   
 }
 
-string lastPivot0Name = "", lastPivot1Name = "";
+string lastPivotNames[3];
 void MarketStructure::DrawPivots(PIVOT &pivots[], const MqlRates &rates[]) {
-   deleteLineIfNotUsed(lastPivot0Name, 5, pivots);
-   deleteLineIfNotUsed(lastPivot1Name, 5, pivots);
+   for(int i=0; i<3; i++) deleteLineIfNotUsed(lastPivotNames[i], 5, pivots);
    drawPivots(pivots, rates);
-   if (ArraySize(pivots) >= 2) {
-      lastPivot0Name = LINE_PREFIX + IntegerToString(pivots[1].time);
-      lastPivot1Name = LINE_PREFIX + IntegerToString(pivots[2].time);
-   } else {
-      lastPivot0Name = ""; lastPivot1Name = "";
-   }
+   
+   int numPivots = MathMin(3, ArraySize(pivots)-1);
+   for(int i=0; i<numPivots; i++) lastPivotNames[i] = LINE_PREFIX + IntegerToString(pivots[i+1].time);
+   for(int i=numPivots; i<3; i++) lastPivotNames[i] = "";
 }
 
 int numErrror = 0;
@@ -200,78 +197,162 @@ void deleteLineIfNotUsed(string lineName, int maxSearch, PIVOT &pivots[]) {
    }
 }
 
-void MarketStructure::UpdateExtPivots(PIVOT &extPivots[], PIVOT &pivots[], MqlRates &rates[]) {
+void MarketStructure::UpdateExtPivots(PIVOT &extPivots[], PIVOT &pivots[])
+{
    int numPivot = ArraySize(pivots);
-   
-   if(numPivot<=3) return;
-   
-   ArrayResize(extPivots, numPivot);
-   int numExtPivot = 2;
-   
-   extPivots[0] = pivots[numPivot-1];
-   extPivots[1] = pivots[numPivot-2];
-   
-   PIVOT lastPivotHigh, lastPivotLow;
-   if(extPivots[1].type == PIVOT_HIGH) {
-      lastPivotHigh = extPivots[1];
-      lastPivotLow = extPivots[0];
-   } else {
-      lastPivotHigh = extPivots[0];
-      lastPivotLow = extPivots[1];
-   }
-   PIVOT internalLowest = pivots[numPivot-3], internalHighest = pivots[numPivot-3];
-   
-   for(int i = numPivot-3; i>0; i--) {
-      PIVOT currentPivot = pivots[i];
-      if (currentPivot.price < lastPivotLow.price) {  // BoS bear
-         if (extPivots[numExtPivot-1].type == PIVOT_LOW) {  // lastExtPivot type ==> LOW
-            extPivots[numExtPivot++] = internalHighest;     // insert internal highest
-            extPivots[numExtPivot++] = currentPivot;        // insert external low
-            lastPivotHigh = internalHighest;
-         } else { // BoS
-            extPivots[numExtPivot++] = currentPivot;
+   if(numPivot < 3)
+      return;
+
+   int numExt = ArraySize(extPivots);
+   int extCapacity = numExt;
+   int lastIdxBar = -1;
+
+   if(numExt>0) {
+      // remove last 2 pivot
+      if (numExt>=2) numExt -= 2;
+      datetime pivotTime = extPivots[numExt-1].time;
+      
+      // find lastIdxBar
+      for (int i=numPivot-1; i>=0; i--)
+         if (pivots[i].time == pivotTime) {
+            lastIdxBar = i;
+            break;
          }
-         lastPivotLow = currentPivot;            
-         internalLowest = pivots[i-1];
-         internalHighest = pivots[i-1];
-         continue;
-      }
-      if (currentPivot.price > lastPivotHigh.price) {  // BoS bull
-         if (extPivots[numExtPivot-1].type == PIVOT_HIGH) { // lastExtPivot type ==> HIGH
-            extPivots[numExtPivot++] = internalLowest;      // insert internal Lowest
-            extPivots[numExtPivot++] = currentPivot;        // insert external High
-            lastPivotLow = internalLowest;
-         } else { // BoS
-            extPivots[numExtPivot++] = currentPivot;
-         }
-         lastPivotHigh = currentPivot;            
-         internalLowest = pivots[i-1];
-         internalHighest = pivots[i-1];
-         continue;
-      }
-      // Check internal pivot
-      if (currentPivot.price < internalLowest.price) {
-         internalLowest = currentPivot;
-      } else if (currentPivot.price > internalHighest.price) {
-            internalHighest = currentPivot;
+
+      if (lastIdxBar == -1) {
+         Print("IdxBarNotFound, resetted");
+         numExt = 0;
       }
    }
+
+   // init first 2 pivots
+   if(numExt == 0)
+   {
+      extCapacity = 10;
+      ArrayResize(extPivots, extCapacity);
+      extPivots[0] = pivots[numPivot-1];
+      extPivots[1] = pivots[numPivot-2];
+      numExt = 2;
+      lastIdxBar = numPivot-2;
+   }
+
+   // determine last structure pivots
+   PIVOT lastHigh, lastLow;
+
+   if(extPivots[numExt-1].type == PIVOT_HIGH)
+   {
+      lastHigh = extPivots[numExt-1];
+      lastLow  = extPivots[numExt-2];
+   }
+   else
+   {
+      lastHigh = extPivots[numExt-2];
+      lastLow  = extPivots[numExt-1];
+   }
    
-   ArrayResize(extPivots, numExtPivot);
+   if(lastIdxBar < 1) return;
+   
+   PIVOT internalLow  = pivots[lastIdxBar-1];
+   PIVOT internalHigh = internalLow;
+
+   for(int i = lastIdxBar-1; i >= 0; i--)
+   {
+      PIVOT p = pivots[i];
+
+      // bearish BOS
+      if(p.price < lastLow.price)
+      {
+         if(extPivots[numExt-1].type == PIVOT_LOW)
+         {
+            if(extCapacity < numExt+2) {
+               extCapacity+=10;
+               ArrayResize(extPivots, extCapacity);
+            }
+            extPivots[numExt++] = internalHigh;
+            extPivots[numExt++] = p;
+            lastHigh = internalHigh;
+            lastIdxBar = i;
+         }
+         else
+         {
+            if(extCapacity < numExt+1) {
+               extCapacity+=10;
+               ArrayResize(extPivots, extCapacity);
+            }         
+            extPivots[numExt++] = p;
+            lastIdxBar = i;
+         }
+
+         lastLow = p;
+
+         if(i>0)
+         {
+            internalLow  = pivots[i-1];
+            internalHigh = internalLow;
+         }
+
+         continue;
+      }
+
+      // bullish BOS
+      if(p.price > lastHigh.price)
+      {
+         if(extPivots[numExt-1].type == PIVOT_HIGH)
+         {
+            if(extCapacity < numExt+2) {
+               extCapacity+=10;
+               ArrayResize(extPivots, extCapacity);
+            }         
+            extPivots[numExt++] = internalLow;
+            extPivots[numExt++] = p;
+            lastLow = internalLow;
+            lastIdxBar = i;            
+         }
+         else
+         {
+            if(extCapacity < numExt+1) {
+               extCapacity+=10;
+               ArrayResize(extPivots, extCapacity);
+            }         
+            extPivots[numExt++] = p;
+            lastIdxBar = i;            
+         }
+
+         lastHigh = p;
+
+         if(i>0)
+         {
+            internalLow  = pivots[i-1];
+            internalHigh = internalLow;
+         }
+
+         continue;
+      }
+
+      // update internal pivots
+      if(p.price < internalLow.price)
+         internalLow = p;
+      else
+      if(p.price > internalHigh.price)
+         internalHigh = p;
+   }
+
+   ArrayResize(extPivots, numExt);
 }
 
-void MarketStructure::DrawExtPivots(PIVOT &extPivots[], MqlRates &rates[]) {
-   int numPivot = ArraySize(extPivots);
-   if (numPivot < 3) {
-      if (numErrror < 3) PrintFormat("Draw ext pivot error, NUM PIVOT: %d", numPivot);
-      numErrror++;
-      return;
-   }
+string lastExtPivotNames[3];
+void MarketStructure::DrawExtPivots(PIVOT &pivots[]) {
+   for(int i=0; i<3; i++) deleteLineIfNotUsed(lastExtPivotNames[i], 5, pivots);
    
-   for(int i=1; i<numPivot-1; i++) {
-      const string lineName = LINE_PREFIXEXT + IntegerToString(extPivots[i].time);
-      DrawExtPivot(lineName, extPivots[i-1], extPivots[i], extPivots[i+1]);
+   // DRAW EXT PIVOTS
+   int numPivots = ArraySize(pivots);
+   for(int i=1; i<numPivots-1; i++) {
+      const string lineName = LINE_PREFIXEXT + IntegerToString(pivots[i].time);
+      DrawExtPivot(lineName, pivots[i-1], pivots[i], pivots[i+1]);
    }
+   numPivots = MathMin(3,numPivots);
+   for(int i=0; i<numPivots; i++) lastExtPivotNames[i] = LINE_PREFIXEXT + IntegerToString(pivots[i+1].time);
+   for(int i=numPivots; i<3; i++) lastExtPivotNames[i] = "";
 }
 
 void MergePivots(PIVOT &dest[], PIVOT &src[])
@@ -285,9 +366,9 @@ void MergePivots(PIVOT &dest[], PIVOT &src[])
    datetime matchTime = src[srcSize-1].time;
    int matchIndex = -1;
 
-   int maxSearch = MathMin(destSize, 20); // cukup scan depan saja
+   int maxSearch = MathMin(destSize, 20);
 
-   for(int i=0; i<maxSearch; i++)
+   for(int i=0;i<maxSearch;i++)
    {
       if(dest[i].time == matchTime)
       {
@@ -297,10 +378,9 @@ void MergePivots(PIVOT &dest[], PIVOT &src[])
 
       if(dest[i].time < matchTime)
       {
-         // pivot extend scenario
-         if(i > 0 && srcSize >= 2 && dest[i-1].time == src[srcSize-2].time)
+         if(i>0 && srcSize>=2 && dest[i-1].time == src[srcSize-2].time)
          {
-            srcSize--;          // drop pivot terakhir src
+            srcSize--;
             matchIndex = i-1;
          }
          break;
@@ -315,66 +395,8 @@ void MergePivots(PIVOT &dest[], PIVOT &src[])
    ArrayResize(dest, srcSize + tailSize);
 
    // shift tail
-   for(int i=tailSize-1; i>=0; i--)
-      dest[srcSize+i] = dest[matchIndex+1+i];
+   ArrayCopy(dest, dest, srcSize, matchIndex+1, tailSize);
 
    // copy src
-   for(int i=0;i<srcSize;i++)
-      dest[i] = src[i];
-}
-
-void MergePivotsBackup(PIVOT &dest[], PIVOT &src[])
-{
-   int destSize = ArraySize(dest);
-   int srcSize  = ArraySize(src);
-
-   if(srcSize == 0)
-      return;
-
-   datetime matchTime = src[srcSize-1].time;   // pivot tertua di src
-
-   int matchIndex = -1;
-
-   // cari di dest
-   for(int i=0; i<10; i++)
-   {
-      if(dest[i].time == matchTime)
-      {
-         matchIndex = i;
-         break;
-      }
-      if(dest[i].time < matchTime)
-      {
-         if(dest[i-1].time == src[srcSize-2].time) {
-            ArrayResize(src, --srcSize);
-            matchIndex = i-1;
-            break;
-         } else {
-            Print(dest[i-1].time, " compare ", src[srcSize-2].time, " before: ", matchTime); 
-            Print(i, " DEST: ", dest[i].time, ", ", dest[i+1].time); 
-            Print("SRC: ", src[0].time, ", ", src[1].time, ", ", src[2].time, ", ", src[3].time, ", ", src[4].time);
-            break; 
-         }
-      }
-   }
-
-   if(matchIndex == -1)
-      return;
-
-   int newSize = srcSize + (destSize - matchIndex - 1);
-
-   PIVOT tmp[];
-   ArrayResize(tmp,newSize);
-
-   // copy src (pivot terbaru)
-   for(int i=0;i<srcSize;i++)
-      tmp[i] = src[i];
-
-   // copy sisa dest
-   for(int i=matchIndex+1;i<destSize;i++)
-      tmp[srcSize + (i-matchIndex-1)] = dest[i];
-
-   // replace dest
-   ArrayResize(dest,newSize);
-   ArrayCopy(dest,tmp);
+   ArrayCopy(dest, src, 0, 0, srcSize);
 }

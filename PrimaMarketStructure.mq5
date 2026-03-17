@@ -107,7 +107,7 @@ void OnChartEvent(const int id,
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
 //+------------------------------------------------------------------+
-PIVOT globalPivots[];
+PIVOT globalPivots[], globalExtPivots[];
 int OnCalculate(const int32_t rates_total,
                 const int32_t prev_calculated, 
                 const int32_t begin, 
@@ -116,7 +116,13 @@ int OnCalculate(const int32_t rates_total,
    if(rates_total < inpNumRightBar) return(0);
    
    // reset objects every 1000 ticks
-   if (tickCount++>=REFRESH_COUNT) { ObjectsDeleteAll(0, LINE_PREFIX); tickCount = 0; ArrayResize(globalPivots, 0); }
+   if (tickCount++>=REFRESH_COUNT) { 
+      ObjectsDeleteAll(0, LINE_PREFIX); 
+      ObjectsDeleteAll(0, LINE_PREFIXEXT); 
+      tickCount = 0; 
+      ArrayResize(globalPivots, 0);
+      ArrayResize(globalExtPivots, 0);
+   }
    bool needRefresh = tickCount == 0;
    MqlRates rates[];
    int bars_to_copy = needRefresh ? MathMin(rates_total, inpMaxPivot * 20) : 4 * 20;
@@ -138,10 +144,8 @@ int OnCalculate(const int32_t rates_total,
    else
       ObjectsDeleteAll(0, LINE_PREFIX);
       
+   ms.UpdateExtPivots(globalExtPivots, globalPivots);
    if (extVisible) {
-      PIVOT extPivots[];
-      ms.UpdateExtPivots(extPivots, globalPivots, rates);
-      
       /*if (neverPrint) {
          for(int i=0; i<ArraySize(extPivots); i++) {
             PrintFormat("ExtPV[%d] Price %f, Type %s", i, 
@@ -149,7 +153,7 @@ int OnCalculate(const int32_t rates_total,
          }
       }*/
       
-      ms.DrawExtPivots(extPivots, rates);
+      ms.DrawExtPivots(globalExtPivots);
    } else ObjectsDeleteAll(0, LINE_PREFIXEXT);      
 
    neverPrint = false;
